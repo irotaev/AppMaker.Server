@@ -44,16 +44,16 @@ namespace AppMakerServer.Controllers
         [HttpGet("get-file")]
         public ActionResult<string> GetFile()
         {
-            var text = System.IO.File.ReadAllText(Path.Combine(_hostingEnvironment.WebRootPath, "simple\\src\\app\\app.component.ts"));
+            var text = System.IO.File.ReadAllText(Path.Combine(_hostingEnvironment.WebRootPath, "simple\\src\\app\\app.component.html"));
 
             return Ok(text);
         }
 
         // POST api/values
         [HttpPost("save-file")]
-        public ActionResult GetFile([FromBody] string text)
+        public ActionResult SaveFile([FromBody] string text)
         {
-            System.IO.File.WriteAllText(Path.Combine(_hostingEnvironment.WebRootPath, "simple\\src\\app\\app.component.ts"), text);
+            System.IO.File.WriteAllText(Path.Combine(_hostingEnvironment.WebRootPath, "simple\\src\\app\\app.component.html"), text);
 
             return Ok();
         }
