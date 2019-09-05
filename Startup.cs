@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AppMaker.Server.Middleware;
 using AppMaker.Server.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -54,6 +55,8 @@ namespace AppMakerServer
             app.UseStaticFiles();
             app.UseWebSockets();
             app.UseHttpsRedirection();
+            //app.UseMiddleware<WebSocketMiddleware>();
+
             app.UseMvc();
         }
     }

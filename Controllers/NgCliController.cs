@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.WebSockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using AppMaker.Server.Services;
@@ -65,19 +66,19 @@ namespace AppMaker.Server.Controllers
         }
 
         [HttpGet("ng-console")]
-        public async Task<ActionResult> NgConsole()
+        public async Task NgConsole()
         {
-            if (!HttpContext.WebSockets.IsWebSocketRequest) return Forbid();
+            if (!HttpContext.WebSockets.IsWebSocketRequest) return;
 
             var socket = await HttpContext.WebSockets.AcceptWebSocketAsync();
 
             while (socket.State == WebSocketState.Open)
             {
-                var outgoing = new ArraySegment<byte>(new byte[4024], 0, 4024);
+                var outgoing = new ArraySegment<byte>(Encoding.UTF8.GetBytes("Hello world!"));
                 await socket.SendAsync(outgoing, WebSocketMessageType.Text, true, CancellationToken.None);
-            }
 
-            return Ok();
+                Task.Delay(5000).Wait();
+            }
         }
 
         public class SaveFileRequest
