@@ -14,11 +14,20 @@ namespace AppMaker.Server.Services
         private readonly IHostingEnvironment _hostingEnvironment;
         private const string CmdPath = @"C:\windows\system32\cmd.exe";
 
-        private readonly Process _process;
+        private Process _process;
 
         public CmdProcessService(IHostingEnvironment hostingEnvironment)
         {
             _hostingEnvironment = hostingEnvironment;
+            CreateProcess();
+
+            RunProcessTask();
+        }
+
+        private Process CreateProcess()
+        {
+            _process?.Kill();
+
             _process = new Process
             {
                 StartInfo =
@@ -32,12 +41,19 @@ namespace AppMaker.Server.Services
 
             _process.OutputDataReceived += CaptureOutput;
 
+            return _process;
+        }
+
+        private void RunProcessTask()
+        {
+            if (_process == null) return;
+
+            _process.Start();
+            _process.BeginOutputReadLine();
+
             Task.Run(() =>
             {
-                _process.Start();
-                _process.BeginOutputReadLine();
-
-                WriteInputAsync($"cd {hostingEnvironment.WebRootPath}\\simple").Wait();
+                WriteInputAsync($"cd {_hostingEnvironment.WebRootPath}\\simple").Wait();
 
                 _process.WaitForExit();
             });
@@ -49,6 +65,13 @@ namespace AppMaker.Server.Services
             {
                 Debug.WriteLine($"Received: {e.Data}");
             }
+        }
+
+        public void ReloadProcess()
+        {
+            CreateProcess();
+
+            RunProcessTask();
         }
 
         public async Task WriteInputAsync([NotNull] string input)

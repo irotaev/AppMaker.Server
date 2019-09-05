@@ -52,6 +52,7 @@ namespace AppMakerServer
             }
 
             app.UseStaticFiles();
+            app.UseWebSockets();
             app.UseHttpsRedirection();
             app.UseMvc();
         }

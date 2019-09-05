@@ -2,6 +2,9 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Net.WebSockets;
+using System.Threading;
 using System.Threading.Tasks;
 using AppMaker.Server.Services;
 using JetBrains.Annotations;
@@ -38,6 +41,8 @@ namespace AppMaker.Server.Controllers
         [HttpGet("serve")]
         public async Task<ActionResult> Serve()
         {
+            _cmdProcessService.ReloadProcess();
+
             await _cmdProcessService.WriteInputAsync("ng serve");
 
             return Ok();
@@ -55,6 +60,22 @@ namespace AppMaker.Server.Controllers
         public ActionResult SaveFileText([NotNull] [FromBody] SaveFileRequest request)
         {
             System.IO.File.WriteAllText(Path.Combine(_hostingEnvironment.WebRootPath, $"simple\\src\\app\\{request.FileName}"), request.FileText);
+
+            return Ok();
+        }
+
+        [HttpGet("ng-console")]
+        public async Task<ActionResult> NgConsole()
+        {
+            if (!HttpContext.WebSockets.IsWebSocketRequest) return Forbid();
+
+            var socket = await HttpContext.WebSockets.AcceptWebSocketAsync();
+
+            while (socket.State == WebSocketState.Open)
+            {
+                var outgoing = new ArraySegment<byte>(new byte[4024], 0, 4024);
+                await socket.SendAsync(outgoing, WebSocketMessageType.Text, true, CancellationToken.None);
+            }
 
             return Ok();
         }
