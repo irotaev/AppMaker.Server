@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using Microsoft.AspNetCore.Hosting;
@@ -15,6 +16,8 @@ namespace AppMaker.Server.Services
         private const string CmdPath = @"C:\windows\system32\cmd.exe";
 
         private Process _process;
+        public readonly ManualResetEvent SignalEvent = new ManualResetEvent(false);
+        public readonly Queue<string> CmdLog = new Queue<string>();
 
         public CmdProcessService(IHostingEnvironment hostingEnvironment)
         {
@@ -26,7 +29,13 @@ namespace AppMaker.Server.Services
 
         private Process CreateProcess()
         {
-            _process?.Kill();
+            if (_process != null)
+            {
+                _process.OutputDataReceived -= CaptureOutput;
+                _process.Kill();
+                _process.Close();
+                _process.Dispose(); 
+            }
 
             _process = new Process
             {
@@ -61,10 +70,10 @@ namespace AppMaker.Server.Services
 
         private void CaptureOutput(object sender, DataReceivedEventArgs e)
         {
-            if (e.Data != null)
-            {
-                Debug.WriteLine($"Received: {e.Data}");
-            }
+            if (e.Data == null) return;
+
+            CmdLog.Enqueue($"Received: {e.Data}");
+            SignalEvent.Set();
         }
 
         public void ReloadProcess()

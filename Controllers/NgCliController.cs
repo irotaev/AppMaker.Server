@@ -74,10 +74,10 @@ namespace AppMaker.Server.Controllers
 
             while (socket.State == WebSocketState.Open)
             {
-                var outgoing = new ArraySegment<byte>(Encoding.UTF8.GetBytes("Hello world!"));
-                await socket.SendAsync(outgoing, WebSocketMessageType.Text, true, CancellationToken.None);
+                _cmdProcessService.SignalEvent.WaitOne();
 
-                Task.Delay(5000).Wait();
+                var outgoing = new ArraySegment<byte>(Encoding.UTF8.GetBytes(_cmdProcessService.CmdLog.Dequeue()));
+                await socket.SendAsync(outgoing, WebSocketMessageType.Text, true, CancellationToken.None);
             }
         }
 
