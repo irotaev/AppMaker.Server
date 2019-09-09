@@ -7,11 +7,13 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using AppMaker.Server.Model;
 using AppMaker.Server.Services;
 using JetBrains.Annotations;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AppMaker.Server.Controllers
 {
@@ -31,20 +33,10 @@ namespace AppMaker.Server.Controllers
             _cmdProcessService = cmdProcessService;
         }
 
-        [HttpPost("create-component")]
-        public async Task<ActionResult> CreateComponent([NotNull] [FromBody] string componentName)
+        [HttpGet("reload")]
+        public async Task<ActionResult> Reload()
         {
-            await _cmdProcessService.WriteInputAsync($"ng generate component {componentName}");
-
-            return Ok();
-        }
-
-        [HttpGet("serve")]
-        public async Task<ActionResult> Serve()
-        {
-            _cmdProcessService.ReloadProcess();
-
-            await _cmdProcessService.WriteInputAsync("ng serve");
+            _cmdProcessService.StopProcess();
 
             return Ok();
         }
@@ -65,19 +57,29 @@ namespace AppMaker.Server.Controllers
             return Ok();
         }
 
-        [HttpGet("ng-console")]
-        public async Task NgConsole()
+        [HttpPost("ng-console-write")]
+        public void NgConsoleWrite([NotNull] [FromBody] NgConsoleWriteRequest request)
+        {
+            _cmdProcessService.WriteInput(request.Command);
+        }
+
+        [HttpGet("ng-console-read")]
+        public async Task NgConsoleRead()
         {
             if (!HttpContext.WebSockets.IsWebSocketRequest) return;
 
             var socket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-
             while (socket.State == WebSocketState.Open)
             {
                 _cmdProcessService.SignalEvent.WaitOne();
 
-                var outgoing = new ArraySegment<byte>(Encoding.UTF8.GetBytes(_cmdProcessService.CmdLog.Dequeue()));
-                await socket.SendAsync(outgoing, WebSocketMessageType.Text, true, CancellationToken.None);
+                while (_cmdProcessService.CmdLog.TryDequeue(out var logStr))
+                {
+                    if (string.IsNullOrWhiteSpace(logStr)) continue;
+
+                    var outgoing = new ArraySegment<byte>(Encoding.UTF8.GetBytes(logStr));
+                    await socket.SendAsync(outgoing, WebSocketMessageType.Text, true, CancellationToken.None);
+                }
             }
         }
 

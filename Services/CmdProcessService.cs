@@ -13,84 +13,77 @@ namespace AppMaker.Server.Services
     public class CmdProcessService : IDisposable
     {
         private readonly IHostingEnvironment _hostingEnvironment;
-        private const string CmdPath = @"C:\windows\system32\cmd.exe";
+        private const string CmdPath = @"C:\Program Files\nodejs\node.exe";
 
-        private Process _process;
-        public readonly ManualResetEvent SignalEvent = new ManualResetEvent(false);
+        private readonly List<Process> _processes = new List<Process>();
+        public readonly AutoResetEvent SignalEvent = new AutoResetEvent(false);
         public readonly Queue<string> CmdLog = new Queue<string>();
 
         public CmdProcessService(IHostingEnvironment hostingEnvironment)
         {
             _hostingEnvironment = hostingEnvironment;
-            CreateProcess();
-
-            RunProcessTask();
         }
 
-        private Process CreateProcess()
+        private Process CreateProcess(string arguments)
         {
-            if (_process != null)
-            {
-                _process.OutputDataReceived -= CaptureOutput;
-                _process.Kill();
-                _process.Close();
-                _process.Dispose(); 
-            }
-
-            _process = new Process
+            var process = new Process
             {
                 StartInfo =
                 {
                     FileName = CmdPath,
                     RedirectStandardOutput = true,
                     RedirectStandardInput = true,
-                    RedirectStandardError = true
+                    RedirectStandardError = true,
+                    Arguments = $"{_hostingEnvironment.WebRootPath}\\simple\\node_modules\\@angular\\cli\\bin\\ng " + arguments,
+                    WorkingDirectory = $"{_hostingEnvironment.WebRootPath}\\simple"
                 }
             };
 
-            _process.OutputDataReceived += CaptureOutput;
+            process.OutputDataReceived += CaptureOutput;
+            process.ErrorDataReceived += CaptureOutput;
 
-            return _process;
-        }
-
-        private void RunProcessTask()
-        {
-            if (_process == null) return;
-
-            _process.Start();
-            _process.BeginOutputReadLine();
-
-            Task.Run(() =>
-            {
-                WriteInputAsync($"cd {_hostingEnvironment.WebRootPath}\\simple").Wait();
-
-                _process.WaitForExit();
-            });
+            return process;
         }
 
         private void CaptureOutput(object sender, DataReceivedEventArgs e)
         {
             if (e.Data == null) return;
 
-            CmdLog.Enqueue($"Received: {e.Data}");
+            CmdLog.Enqueue($"{e.Data}");
             SignalEvent.Set();
         }
 
-        public void ReloadProcess()
+        public void StopProcess()
         {
-            CreateProcess();
+            lock (_processes)
+            {
+                _processes.ToList().ForEach(x =>
+                {
+                    if (x.HasExited) return;
 
-            RunProcessTask();
+                    x.Kill();
+                    x.Close();
+                    x.Dispose();
+
+                    _processes.Remove(x);
+                });
+            }
         }
 
-        public async Task WriteInputAsync([NotNull] string input)
+        public void WriteInput([NotNull] string input)
         {
-            await _process.StandardInput.WriteLineAsync(input);
+            var process = CreateProcess(input);
+            process.Start();
+            process.BeginOutputReadLine();
+
+            Task.Run(() => { process.WaitForExit(); });
+
+            _processes.Add(process);
         }
 
         public void Dispose()
         {
-            _process?.Dispose();
+            StopProcess();
         }
     }
 }
